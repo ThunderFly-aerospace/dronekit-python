@@ -848,6 +848,103 @@ class Channels(dict):
         self._overrides._active = True
         self._overrides._send()
 
+class Outputs(dict):
+    """
+    A dictionary class for managing PWM ouutputs information associated with a :py:class:`Vehicle`.
+
+    An object of this type is accessed through :py:attr:`Vehicle.outputs`. This object also stores
+    """
+
+    def __init__(self, vehicle, count):
+        self._vehicle = vehicle
+        self._count = count
+        #self._overrides = ChannelsOverride(vehicle)
+
+        # populate readback
+        self._readonly = False
+        for k in range(0, count):
+            self[k + 1] = None
+        self._readonly = True
+
+    @property
+    def count(self):
+        """
+        The number of channels defined in the dictionary (currently 16).
+        """
+        return self._count
+
+    def __getitem__(self, key):
+        return dict.__getitem__(self, str(key))
+
+    def __setitem__(self, key, value):
+        if self._readonly:
+            raise TypeError('__setitem__ is not supported on Outputs object')
+        return dict.__setitem__(self, str(key), value)
+
+    def __len__(self):
+        return self._count
+
+    def _update_outputs(self, output, value):
+        # If we have outputs on different ports, we expand the Outputs
+        # object to support them.
+        output = int(output)
+        self._readonly = False
+        self[output] = value
+        self._readonly = True
+        self._count = max(self._count, output)
+
+    # @property
+    # def overrides(self):
+    #     """
+    #     Attribute to read, set and clear channel overrides (also known as "rc overrides")
+    #     associated with a :py:class:`Vehicle` (via :py:class:`Vehicle.channels`). This is an
+    #     object of type :py:class:`ChannelsOverride`.
+    #
+    #     For more information and examples see :ref:`example_channel_overrides`.
+    #
+    #     To set channel overrides:
+    #
+    #     .. code:: python
+    #
+    #         # Set and clear overrids using dictionary syntax (clear by setting override to none)
+    #         vehicle.channels.overrides = {'5':None, '6':None,'3':500}
+    #
+    #         # You can also set and clear overrides using indexing syntax
+    #         vehicle.channels.overrides['2'] = 200
+    #         vehicle.channels.overrides['2'] = None
+    #
+    #         # Clear using 'del'
+    #         del vehicle.channels.overrides['3']
+    #
+    #         # Clear all overrides by setting an empty dictionary
+    #         vehicle.channels.overrides = {}
+    #
+    #     Read the channel overrides either as a dictionary or by index. Note that you'll get
+    #     a ``KeyError`` exception if you read a channel override that has not been set.
+    #
+    #     .. code:: python
+    #
+    #         # Get all channel overrides
+    #         print " Channel overrides: %s" % vehicle.channels.overrides
+    #         # Print just one channel override
+    #         print " Ch2 override: %s" % vehicle.channels.overrides['2']
+    #     """
+    #     return self._overrides
+
+    # @overrides.setter
+    # def overrides(self, newch):
+    #     self._overrides._active = False
+    #     self._overrides.clear()
+    #     for k, v in newch.items():
+    #         if v:
+    #             self._overrides[str(k)] = v
+    #         else:
+    #             try:
+    #                 del self._overrides[str(k)]
+    #             except:
+    #                 pass
+    #     self._overrides._active = True
+    #     self._overrides._send()
 
 class Locations(HasObservers):
     """
@@ -1154,6 +1251,22 @@ class Vehicle(HasObservers):
                 set_rc(i, getattr(m, "chan{}_raw".format(i)))
 
             self.notify_attribute_listeners('channels', self.channels)
+
+
+        # All keys are strings.
+        self._outputs = Outputs(self, 16)
+
+        @self.on_message('SERVO_OUTPUT_RAW')
+        def listener(self, name, m):
+            def set_output(chnum, v):
+                '''Private utility for handling PWM outputs messages'''
+                # use port to allow ch nums greater than 16
+                self._outputs._update_outputs(str(m.port * 16 + chnum), v)
+
+            for i in range(1, 16+1):
+                set_output(i, getattr(m, "servo{}_raw".format(i)))
+
+            self.notify_attribute_listeners('outputs', self.outputs)
 
         self._voltage = None
         self._current = None
@@ -1917,6 +2030,27 @@ class Vehicle(HasObservers):
 
         """
         return self._channels
+
+
+    @property
+    def outputs(self):
+        """
+        The PWM output values from the Flight controller (:py:class:`Outputs`).
+
+        To read the PWM outputs from the autopilot:
+
+        .. code:: python
+
+            # Get all PWM outputs from autopilot
+            print("PWM outputs:", vehicle.outputs)
+
+            # Access outputs individually
+            print("Read outputs individually:")
+            print(" Ch1: %s" % vehicle.outputs['1'])
+            print(" Ch2: %s" % vehicle.outputs['2'])
+
+        """
+        return self._outputs
 
     @property
     def home_location(self):
