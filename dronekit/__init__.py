@@ -1462,7 +1462,7 @@ class Vehicle(HasObservers):
         self._heartbeat_timeout = False
 
         self._heartbeat_warning = 5
-        self._heartbeat_error = 30
+        self._heartbeat_error = 0
         self._heartbeat_system = None
 
         @handler.forward_loop
@@ -1476,8 +1476,10 @@ class Vehicle(HasObservers):
             # Timeouts.
             if self._heartbeat_started:
                 if self._heartbeat_error and monotonic.monotonic() - self._heartbeat_lastreceived > self._heartbeat_error > 0:
-                    raise APIException('No heartbeat in %s seconds, aborting.' %
-                                       self._heartbeat_error)
+                    print("OVER TIMEOUT", self._heartbeat_error, monotonic.monotonic() - self._heartbeat_lastreceived, self._heartbeat_error)
+                    pass
+                    #raise APIException('No heartbeat in %s seconds, aborting.' %
+                    #                   self._heartbeat_error)
                 elif monotonic.monotonic() - self._heartbeat_lastreceived > self._heartbeat_warning:
                     if self._heartbeat_timeout is False:
                         self._logger.warning('Link timeout, no heartbeat in last %s seconds' % self._heartbeat_warning)
@@ -2394,6 +2396,8 @@ class Vehicle(HasObservers):
         self._heartbeat_error = heartbeat_timeout or 0
         self._heartbeat_started = True
         self._heartbeat_lastreceived = start
+        print("INICIALIZACE CASU", heartbeat_timeout)
+        print("INICIALIZACE CASU", self._heartbeat_error)
 
         # Poll for first heartbeat.
         # If heartbeat times out, this will interrupt.
